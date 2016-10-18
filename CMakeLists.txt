@@ -21,8 +21,11 @@ include_directories(${PROJECT_SOURCE_DIR}/src
                     ${PROJECT_SOURCE_DIR}/third_party/libwebm/webm_parser/include
                     ${XCB_INCLUDE_DIRS}
                     ${X11_INCLUDE_DIRS}
+                    /home/cyberzx/vulkan/VulkanSDK/1.0.26.0/x86_64/include
                     #${VK_INCLUDE_DIRS}
                     )
+
+link_directories(/home/cyberzx/vulkan/VulkanSDK/1.0.26.0/x86_64/lib)
 
 #add_subdirectory(third_party/libwebm)
 #add_subdirectory(third_party/libvpx)

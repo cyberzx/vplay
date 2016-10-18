@@ -14,7 +14,6 @@ void  VKRenderer::initInstance(const char* app_name, const char* engine_name)
   if (!vktools::get_vk_array(vkEnumerateInstanceExtensionProperties, extensions, nullptr))
     throw vulkan_error("failed to get extension properties");
 
-
   for (VkLayerProperties const& props: layers)
   {
     std::vector<VkExtensionProperties>  layerExtensions;
@@ -30,14 +29,16 @@ void  VKRenderer::initInstance(const char* app_name, const char* engine_name)
   std::vector<const char*>  usedInstanceExtensions = chooseExtensions();
   std::vector<const char*>  usedLayers = chooseLayers();
 
-  printf("[VULKAN] used extensions: ");
+  if (!usedInstanceExtensions.empty())
+    printf("[VULKAN] used extensions: ");
   for (const char* ext: usedInstanceExtensions)
     if (ext != usedInstanceExtensions.back())
       printf("%s, ", ext);
     else
       printf("%s\n", ext);
 
-  printf("[VULKAN] used layers: ");
+  if (!usedLayers.empty())
+    printf("[VULKAN] used layers: ");
   for (const char* lay: usedLayers)
     if (lay != usedLayers.back())
       printf("%s, ", lay);
@@ -75,7 +76,6 @@ void  VKRenderer::initInstance(const char* app_name, const char* engine_name)
 void  VKRenderer::chooseGPU(VkSurfaceKHR window_surface)
 {
   windowSurface = window_surface;
-  size_t choosenQueueFamilyIdx = 0;
 
   for (std::pair<VkPhysicalDevice, const GPUInfo> const& gpu: systemGPUs)
   {
@@ -93,7 +93,7 @@ void  VKRenderer::chooseGPU(VkSurfaceKHR window_surface)
         if (presentSupport)
         {
           hasSuitableQueue = true;
-          choosenQueueFamilyIdx = i;
+          graphicsQueueFamilyIdx = i;
           break;
         }
       }
@@ -109,6 +109,58 @@ void  VKRenderer::chooseGPU(VkSurfaceKHR window_surface)
 
   if (activeGPU == VK_NULL_HANDLE)
     throw vulkan_error("failed to find suitable GPU");
+
+  float queuePriorities = 1.0f;
+  VkDeviceQueueCreateInfo queueCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .queueFamilyIndex = graphicsQueueFamilyIdx,
+    .queueCount = 1,
+    .pQueuePriorities = &queuePriorities
+  };
+
+  auto deviceExtensions = chooseDeviceExtensions(systemGPUs[activeGPU]);
+
+  VkDeviceCreateInfo deviceCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .queueCreateInfoCount = 1,
+    .pQueueCreateInfos = &queueCreateInfo,
+    .enabledLayerCount = 0,
+    .ppEnabledLayerNames = nullptr,
+    .enabledExtensionCount = (uint32_t)deviceExtensions.size(),
+    .ppEnabledExtensionNames = deviceExtensions.empty() ? nullptr : deviceExtensions.data(),
+    .pEnabledFeatures = nullptr
+  };
+
+  vktools::checked_call(vkCreateDevice, "failed to create logical device",
+                        activeGPU, &deviceCreateInfo, nullptr, &device);
+
+
+  VkCommandPoolCreateInfo commandPoolInfo = {
+    .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .queueFamilyIndex = graphicsQueueFamilyIdx
+  };
+
+  vktools::checked_call(vkCreateCommandPool, "failed to create command pool",
+                        device, &commandPoolInfo, nullptr, &commandPool);
+
+  commandBuffers.resize(1);
+  VkCommandBufferAllocateInfo commandBufferAllocInfo = {
+    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+    .pNext = nullptr,
+    .commandPool = commandPool,
+    .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+    .commandBufferCount = (uint32_t)commandBuffers.size()
+  };
+
+  vktools::checked_call(vkAllocateCommandBuffers, "failed to allocate command buffers",
+                        device, &commandBufferAllocInfo, commandBuffers.data());
+
 }
 
 void  VKRenderer::collectGPUsInfo()
@@ -131,7 +183,8 @@ void  VKRenderer::collectGPUsInfo()
   }
 }
 
-bool  VKRenderer::hasExtension(const char* ext_name) const
+bool  VKRenderer::hasExtension(const char* ext_name,
+                    std::vector<VkExtensionProperties> const& extensions) const
 {
   for (VkExtensionProperties const& props: extensions)
   {
@@ -151,6 +204,36 @@ bool  VKRenderer::hasLayer(const char* layer_name) const
   return false;
 }
 
+std::vector<const char*>  VKRenderer::chooseDeviceExtensions(GPUInfo& gpu)
+{
+  const char* optional[] = {};
+  const char* required[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_NV_GLSL_SHADER_EXTENSION_NAME};
+  std::vector<const char*>  result;
+
+  for (const char* ext_name: optional)
+  {
+    if (hasExtension(ext_name, gpu.extensions))
+      result.push_back(ext_name);
+    else
+      printf("[VULKAN] Optional device extension %s is not supported\n", ext_name);
+  }
+
+  for (const char* ext_name: required)
+  {
+    if (hasExtension(ext_name, gpu.extensions))
+      result.push_back(ext_name);
+    else
+    {
+      std::string message = "Required extension ";
+      message += ext_name;
+      message += " is not supported";
+      throw vulkan_error(message);
+    }
+  }
+
+  return result;
+}
+
 std::vector<const char*>  VKRenderer::chooseExtensions()
 {
   const char* optional[] = {VK_EXT_DEBUG_REPORT_EXTENSION_NAME};
@@ -159,7 +242,7 @@ std::vector<const char*>  VKRenderer::chooseExtensions()
   std::vector<const char*>  result;
   for (const char* ext_name: optional)
   {
-    if (hasExtension(ext_name))
+    if (hasExtension(ext_name, extensions))
       result.push_back(ext_name);
     else
       printf("[VULKAN] Optional instance extension %s is not supported\n", ext_name);
@@ -167,7 +250,7 @@ std::vector<const char*>  VKRenderer::chooseExtensions()
 
   for (const char* ext_name: required)
   {
-    if (hasExtension(ext_name))
+    if (hasExtension(ext_name, extensions))
       result.push_back(ext_name);
     else
     {

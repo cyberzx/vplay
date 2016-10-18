@@ -13,19 +13,6 @@ public:
   VkInstance  getVkInstance() const { return instance; }
 
 private:
-  std::vector<const char*>  chooseExtensions();
-  std::vector<const char*>  chooseLayers();
-
-  void  collectGPUsInfo();
-
-  bool  hasExtension(const char* ext_name) const;
-  bool  hasLayer(const char* layer_name) const;
-
-private:
-  VkInstance                    instance  = VK_NULL_HANDLE;
-  VkPhysicalDevice              activeGPU = VK_NULL_HANDLE;
-  VkDevice                      device    = VK_NULL_HANDLE;
-
   struct GPUInfo
   {
     VkPhysicalDeviceProperties            props;
@@ -34,6 +21,23 @@ private:
     std::vector<VkExtensionProperties>    extensions;
     std::vector<VkQueueFamilyProperties>  queueFamilies;
   };
+
+  std::vector<const char*>  chooseExtensions();
+  std::vector<const char*>  chooseDeviceExtensions(GPUInfo& gpu);
+  std::vector<const char*>  chooseLayers();
+
+  void  collectGPUsInfo();
+
+  bool  hasExtension(const char* ext_name,
+                      std::vector<VkExtensionProperties> const& extensions) const;
+  bool  hasLayer(const char* layer_name) const;
+
+private:
+  VkInstance                    instance  = VK_NULL_HANDLE;
+  VkPhysicalDevice              activeGPU = VK_NULL_HANDLE;
+  VkDevice                      device    = VK_NULL_HANDLE;
+
+  uint32_t                graphicsQueueFamilyIdx = 0;
 
   std::unordered_map<VkPhysicalDevice, GPUInfo> systemGPUs;
 

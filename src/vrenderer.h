@@ -9,6 +9,7 @@ class VKRenderer
 public:
   void  initInstance(const char* app_name, const char* engine_name);
   void  chooseGPU(VkSurfaceKHR window_surface);
+  void  initSwapchain();
 
   VkInstance  getVkInstance() const { return instance; }
 

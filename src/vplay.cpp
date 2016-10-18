@@ -95,6 +95,7 @@ int main()
     create_window();
 
     renderer->chooseGPU(xcb_surface);
+    renderer->initSwapchain();
 
     webm::WebmParser  wmparser;
   }

@@ -27,7 +27,7 @@ include_directories(${PROJECT_SOURCE_DIR}/src
 
 link_directories(/home/cyberzx/vulkan/VulkanSDK/1.0.26.0/x86_64/lib)
 
-set(ENABLE_WEBM_PARSER true)
+set(ENABLE_WEBM_PARSER ON)
 add_subdirectory(third_party/libwebm)
 #add_subdirectory(third_party/libvpx)
 

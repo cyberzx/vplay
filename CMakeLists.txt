@@ -27,11 +27,10 @@ include_directories(${PROJECT_SOURCE_DIR}/src
 
 link_directories(/home/cyberzx/vulkan/VulkanSDK/1.0.26.0/x86_64/lib)
 
-#add_subdirectory(third_party/libwebm)
+set(ENABLE_WEBM_PARSER true)
+add_subdirectory(third_party/libwebm)
 #add_subdirectory(third_party/libvpx)
 
 add_executable(vplay src/vrenderer.cpp src/vrenderer.h src/vplay.cpp)
-target_link_libraries(vplay ${XCB_LIBRARIES} ${X11_LIBRARIES} vulkan png m)
-
-#target_link_libraries(vplay PUBLIC webm)
+target_link_libraries(vplay webm_parser ${XCB_LIBRARIES} ${X11_LIBRARIES} vulkan png m)
 

@@ -8,6 +8,12 @@
 
 #include  <stdlib.h>
 
+
+#ifdef Status
+#undef Status
+#include  <webm/webm_parser.h>
+#endif
+
 std::unique_ptr<VKRenderer>  renderer;
 
 // window system
@@ -89,6 +95,8 @@ int main()
     create_window();
 
     renderer->chooseGPU(xcb_surface);
+
+    webm::WebmParser  wmparser;
   }
   catch (std::exception const& e)
   {

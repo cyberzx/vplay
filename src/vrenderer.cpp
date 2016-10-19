@@ -7,6 +7,30 @@
 #include  <stdio.h>
 #include  <string.h>
 
+
+void  VKRenderer::getMemoryType(uint32_t type_bits, VkFlags requirements_mask, uint32_t* type_index)
+{
+  if (!activeGPU)
+    throw vulkan_error("failed to get memory type: GPU not selected");
+
+  GPUInfo const& gpuInfo = systemGPUs[activeGPU];
+  for (uint32_t i = 0; i < gpuInfo.memoryProps.memoryTypeCount; ++i)
+  {
+    if ((type_bits & 1) == 1)
+    {
+      if ((gpuInfo.memoryProps.memoryTypes[i].propertyFlags & requirements_mask) ==
+          requirements_mask)
+      {
+        *type_index = i;
+        return;
+      }
+    }
+    type_bits >> 1;
+  }
+
+  throw vulkan_error("failed to find requirenment memory properties");
+}
+
 void  VKRenderer::initInstance(const char* app_name, const char* engine_name)
 {
   if (!vktools::get_vk_array(vkEnumerateInstanceLayerProperties, layers))
@@ -164,7 +188,13 @@ void  VKRenderer::chooseGPU(VkSurfaceKHR window_surface)
 
 }
 
-void  VKRenderer::initSwapchain()
+void  VKRenderer::onResize(VkSurfaceKHR window_surface)
+{
+  windowSurface = window_surface;
+  createSwapchain();
+}
+
+void  VKRenderer::createSwapchain()
 {
   VkSurfaceCapabilitiesKHR surfCaps;
   vktools::checked_call(vkGetPhysicalDeviceSurfaceCapabilitiesKHR, "failed to get surface caps",
@@ -223,7 +253,7 @@ void  VKRenderer::initSwapchain()
     .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
     .presentMode = desiredPM,
     .clipped = VK_TRUE,
-    .oldSwapchain = VK_NULL_HANDLE
+    .oldSwapchain = swapchain
   };
 
   vktools::checked_call(vkCreateSwapchainKHR, "failed to create swapchain",
@@ -238,7 +268,7 @@ void  VKRenderer::initSwapchain()
 
   for (VkImage image: swapchainImages)
   {
-    VkImageViewCreateInfo imageCreateInfo = {
+    VkImageViewCreateInfo imageViewCreateInfo = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
@@ -262,9 +292,80 @@ void  VKRenderer::initSwapchain()
 
     VkImageView  imageView;
     vktools::checked_call(vkCreateImageView, "failed to create image view",
-                          device, &imageCreateInfo, nullptr, &imageView);
+                          device, &imageViewCreateInfo, nullptr, &imageView);
     swapchainViews.push_back(imageView);
   }
+
+  createDepthbuffer();
+}
+
+void  VKRenderer::createDepthbuffer()
+{
+  VkImageCreateInfo imageCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+    .pNext = NULL,
+    .flags = 0,
+    .imageType = VK_IMAGE_TYPE_2D,
+    .format = VK_FORMAT_D16_UNORM,
+    .extent = {
+      .width = swapchainExtent.width,
+      .height= swapchainExtent.height,
+      .depth = 1
+    },
+    .mipLevels = 1,
+    .arrayLayers = 1,
+    .samples = VK_SAMPLE_COUNT_1_BIT,
+    .tiling  = VK_IMAGE_TILING_OPTIMAL,
+    .usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+    .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    .queueFamilyIndexCount = 0,
+    .pQueueFamilyIndices = NULL,
+    .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
+  };
+
+  vktools::checked_call(vkCreateImage, "failed to create depth buffer image",
+                        device, &imageCreateInfo, nullptr, &depthBufferImage);
+
+  VkMemoryRequirements memReqs;
+  vkGetImageMemoryRequirements(device, depthBufferImage, &memReqs);
+
+  VkMemoryAllocateInfo  memAllocInfo = {
+    .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+    .pNext = nullptr,
+    .allocationSize = memReqs.size
+  };
+
+  getMemoryType(memReqs.memoryTypeBits, 0, &memAllocInfo.memoryTypeIndex);
+  vktools::checked_call(vkAllocateMemory, "failed to allocate depth buffer memory",
+                       device, &memAllocInfo, nullptr, &depthBufferMemory);
+
+  vktools::checked_call(vkBindImageMemory, "failed to bind memory to depth buffer",
+                       device, depthBufferImage, depthBufferMemory, 0);
+
+  VkImageViewCreateInfo imageViewCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .image = depthBufferImage,
+    .viewType = VK_IMAGE_VIEW_TYPE_2D,
+    .format = VK_FORMAT_D16_UNORM,
+    .components = {
+      .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+    },
+    .subresourceRange = {
+      .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+      .baseMipLevel = 0,
+      .levelCount = 1,
+      .baseArrayLayer = 0,
+      .layerCount = 1
+    }
+  };
+
+  vktools::checked_call(vkCreateImageView, "failed to create depth buffer image view",
+                        device, &imageViewCreateInfo, nullptr, &depthBufferView);
 }
 
 void  VKRenderer::collectGPUsInfo()

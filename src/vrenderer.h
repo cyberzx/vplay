@@ -9,7 +9,9 @@ class VKRenderer
 public:
   void  initInstance(const char* app_name, const char* engine_name);
   void  chooseGPU(VkSurfaceKHR window_surface);
-  void  initSwapchain();
+  void  createSwapchain();
+
+  void  onResize(VkSurfaceKHR window_surface);
 
   VkInstance  getVkInstance() const { return instance; }
 
@@ -28,6 +30,9 @@ private:
   std::vector<const char*>  chooseLayers();
 
   void  collectGPUsInfo();
+  void  createDepthbuffer();
+
+  void  getMemoryType(uint32_t type_bits, VkFlags requirement_mask, uint32_t* type_index);
 
   bool  hasExtension(const char* ext_name,
                       std::vector<VkExtensionProperties> const& extensions) const;
@@ -56,6 +61,9 @@ private:
   std::vector<VkFramebuffer>    swapchainFBs;
   std::vector<VkCommandBuffer>  commandBuffers;
 
+  VkImage                       depthBufferImage;
+  VkImageView                   depthBufferView;
+  VkDeviceMemory                depthBufferMemory;
 
   VkPipelineLayout              pipelineLayout = VK_NULL_HANDLE;
   VkRenderPass                  renderPass = VK_NULL_HANDLE;

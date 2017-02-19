@@ -1,20 +1,13 @@
-#include  <stdexcept>
-#include  "vrenderer.h"
+#include  "vulkan_api.h"
 #include  "vulkantools.h"
+#include  "v3d.h"
 
+#include  <stdexcept>
 #include  <memory>
 #include  <X11/Xutil.h>
 #include  <xcb/xcb.h>
 
 #include  <stdlib.h>
-
-
-#ifdef Status
-#undef Status
-#include  <webm/webm_parser.h>
-#endif
-
-std::unique_ptr<VKRenderer>  renderer;
 
 // window system
 Display* display;
@@ -75,42 +68,32 @@ void create_window()
   free(reply);
   xcb_map_window(connection, window);
 
-  VkXcbSurfaceCreateInfoKHR surfaceCreateInfo = {
-    .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
-    .pNext = nullptr,
-    .flags = 0,
-    .connection = connection,
-    .window = window
-  };
-
-  vktools::checked_call(vkCreateXcbSurfaceKHR, "failed to create xcb surface",
-                        renderer->getVkInstance(), &surfaceCreateInfo, nullptr, &xcb_surface);
+  xcb_surface = v3d::get_vk().createXcbSurfaceKHR(vk::XcbSurfaceCreateInfoKHR()
+                                                    .setWindow(window)
+                                                    .setConnection(connection));
 }
 
 int main()
 {
   try {
-    renderer.reset(new VKRenderer);
-    renderer->initInstance("vplay", "v12");
+    v3d::init("vplay", "fa20");
     create_window();
-
-    renderer->chooseGPU(xcb_surface);
-    renderer->createSwapchain();
-
-    webm::WebmParser  wmparser;
+    v3d::on_window_create(xcb_surface);
   }
   catch (std::exception const& e)
   {
     printf("%s\n", e.what());
   }
+  v3d::free_resources();
+
   if (xcb_surface)
-    vkDestroySurfaceKHR(renderer->getVkInstance(), xcb_surface, nullptr);
+    v3d::get_vk().destroySurfaceKHR(xcb_surface);
   if (window)
     xcb_destroy_window(connection, window);
   if (connection)
     xcb_disconnect(connection);
   free(atom_wm_delete_window);
 
-  renderer.reset();
+  v3d::shutdown();
   return 0;
 }

@@ -1,7 +1,12 @@
 #pragma once
-#include <vulkan/vulkan.h>
+
+#include "vulkan_api.h"
+
 #include <utility>
 #include <stdexcept>
+#include <vector>
+#include <type_traits>
+#include <functional>
 
 class vulkan_error : public std::runtime_error
 {
@@ -17,44 +22,13 @@ public:
 
 namespace vktools {
 
-inline const char* to_string(VkResult errorCode)
+inline std::string to_string(VkResult code)
 {
-  switch ((int)errorCode)
-  {
-#define TEST_CODE(r) case VK_ ##r: return "VK_" #r
-    TEST_CODE(SUCCESS);
-    TEST_CODE(NOT_READY);
-    TEST_CODE(TIMEOUT);
-    TEST_CODE(EVENT_SET);
-    TEST_CODE(EVENT_RESET);
-    TEST_CODE(INCOMPLETE);
-    TEST_CODE(ERROR_OUT_OF_HOST_MEMORY);
-    TEST_CODE(ERROR_OUT_OF_DEVICE_MEMORY);
-    TEST_CODE(ERROR_INITIALIZATION_FAILED);
-    TEST_CODE(ERROR_DEVICE_LOST);
-    TEST_CODE(ERROR_MEMORY_MAP_FAILED);
-    TEST_CODE(ERROR_LAYER_NOT_PRESENT);
-    TEST_CODE(ERROR_EXTENSION_NOT_PRESENT);
-    TEST_CODE(ERROR_FEATURE_NOT_PRESENT);
-    TEST_CODE(ERROR_INCOMPATIBLE_DRIVER);
-    TEST_CODE(ERROR_TOO_MANY_OBJECTS);
-    TEST_CODE(ERROR_FORMAT_NOT_SUPPORTED);
-    TEST_CODE(ERROR_FRAGMENTED_POOL);
-    TEST_CODE(ERROR_SURFACE_LOST_KHR);
-    TEST_CODE(ERROR_NATIVE_WINDOW_IN_USE_KHR);
-    TEST_CODE(SUBOPTIMAL_KHR);
-    TEST_CODE(ERROR_OUT_OF_DATE_KHR);
-    TEST_CODE(ERROR_INCOMPATIBLE_DISPLAY_KHR);
-    TEST_CODE(ERROR_VALIDATION_FAILED_EXT);
-    TEST_CODE(ERROR_INVALID_SHADER_NV);
-#undef TEST_CODE
-  default:
-    return "UNKNOWN";
-  }
+  return vk::to_string(static_cast<vk::Result>(code));
 }
 
-template<class Func, class... Args>
-void checked_call(Func func, const char* error_str, Args... args)
+template<typename Func, typename... Args>
+void checked_call(Func&& func, const char* error_str, Args&&... args)
 {
   VkResult err = func(std::forward<Args>(args)...);
   if (err != VK_SUCCESS)
@@ -66,32 +40,68 @@ void checked_call(Func func, const char* error_str, Args... args)
   }
 }
 
-template<typename... Args, typename vkEnumObj, typename vkEnumerateFunc>
-requires requires (vkEnumerateFunc func, Args... args) { {func(args..., 0, 0)} -> void; }
-bool get_vk_array(vkEnumerateFunc func, std::vector<vkEnumObj>& result, Args... args)
+template<typename vkEnumerateFunc, typename vkEnumObj, typename... Args>
+auto get_vk_array(vkEnumerateFunc&& func, std::vector<vkEnumObj>& result, Args&&... args)
 {
-  uint32_t count = 0;
-  func(args..., &count, nullptr);
-  result.resize(count);
-  if (count > 0)
-    func(args..., &count, result.data());
-  return true;
-}
-
-template<typename... Args, typename vkEnumObj, typename vkEnumerateFunc>
-requires requires (vkEnumerateFunc func, Args... args) { {func(args..., 0, 0)} -> VkResult; }
-bool get_vk_array(vkEnumerateFunc func, std::vector<vkEnumObj>& result, Args... args)
-{
-  uint32_t count = 0;
-  if (func(args..., &count, nullptr) == VK_SUCCESS)
+  uint32_t elemsNum = 0;
+  typedef decltype(std::invoke(func, std::forward<Args>(args)..., nullptr, nullptr)) vkEnumerateFuncRet;
+  if constexpr (std::is_void<vkEnumerateFuncRet>::value)
   {
-    result.resize(count);
-    if (count > 0)
-      return func(args..., &count, result.data()) == VK_SUCCESS;
-    return true;
+    func(std::forward<Args>(args)..., &elemsNum, nullptr);
+    result.resize(elemsNum);
+    if (elemsNum > 0)
+      func(std::forward<Args>(args)..., &elemsNum, result.data());
   }
-  return false;
+  else
+  {
+    VkResult res = func(std::forward<Args>(args)..., &elemsNum, nullptr);
+    if (res != VK_SUCCESS)
+      return res;
+    result.resize(elemsNum);
+    if (elemsNum == 0)
+      return VK_SUCCESS;
+    return func(std::forward<Args>(args)..., &elemsNum, result.data());
+  }
 }
 
+inline void device_destroy(vk::DeviceMemory& handle, vk::Device const& device)
+{
+  device.freeMemory(handle);
+}
+
+inline void device_destroy(vk::Image& handle, vk::Device const& device)
+{
+  device.destroyImage(handle);
+}
+
+inline void device_destroy(vk::ImageView& handle, vk::Device const& device)
+{
+  device.destroyImageView(handle);
+}
+
+inline void device_destroy(vk::SwapchainKHR& handle, vk::Device const& device)
+{
+  device.destroySwapchainKHR(handle);
+}
+
+template<typename vkHandle>
+void destroy_handle(vkHandle& handle, vk::Device const& device)
+{
+  if (handle)
+  {
+    device_destroy(handle, device);
+    handle = VK_NULL_HANDLE;
+  }
+}
+
+template<typename vkHandle>
+void destroy_handle(vkHandle& handle)
+{
+  if (handle)
+  {
+    handle.destroy();
+    handle = VK_NULL_HANDLE;
+  }
+}
 
 } // namespace vktools

@@ -31,6 +31,6 @@ link_directories(${VULKAN_SDK}/lib)
 #add_subdirectory(third_party/libwebm)
 #add_subdirectory(third_party/libvpx)
 
-add_executable(vplay src/v3d.cpp src/vplay.cpp)
+add_executable(vplay src/v3d.cpp src/shaders.cpp src/vplay.cpp)
 target_link_libraries(vplay ${XCB_LIBRARIES} ${X11_LIBRARIES} vulkan png m)
 

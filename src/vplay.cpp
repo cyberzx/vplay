@@ -23,6 +23,8 @@ VkSurfaceKHR  xcb_surface;
 
 int win_width = 800;
 int win_height = 600;
+static bool quit = false;
+bool  need_resize = false;
 
 void create_window()
 {
@@ -73,17 +75,85 @@ void create_window()
                                                     .setConnection(connection));
 }
 
+static void handle_window_event(const xcb_generic_event_t* event)
+{
+  uint8_t event_code = event->response_type & 0x7f;
+  switch (event_code) {
+  case XCB_CLIENT_MESSAGE:
+      if ((*(xcb_client_message_event_t *)event).data.data32[0] ==
+          (*atom_wm_delete_window).atom) {
+          quit = true;
+      }
+      break;
+  case XCB_KEY_RELEASE: {
+      const xcb_key_release_event_t *key =
+          (const xcb_key_release_event_t *)event;
+
+      switch (key->detail) {
+      case 0x9: // Escape
+          quit = true;
+          break;
+      }
+  } break;
+  case XCB_CONFIGURE_NOTIFY: {
+      printf("configure\n");
+      const xcb_configure_notify_event_t *cfg =
+          (const xcb_configure_notify_event_t *)event;
+        if ((win_width != cfg->width) || (win_height != cfg->height)) {
+            win_width = cfg->width;
+            win_height = cfg->height;
+            need_resize = true;
+        }
+      }
+   break;
+  default:
+      break;
+  }
+}
+
+static void do_resize()
+{
+  need_resize = false;
+  v3d::on_window_resize(xcb_surface);
+}
+
+static void mainloop()
+{
+  xcb_flush(connection);
+
+  while (!quit)
+  {
+    xcb_generic_event_t*  event;
+
+    event = xcb_poll_for_event(connection);
+    while (event)
+    {
+      handle_window_event(event);
+      free(event);
+      event = xcb_poll_for_event(connection);
+    }
+
+    if (need_resize)
+      do_resize();
+
+    v3d::render();
+  }
+}
+
 int main()
 {
   try {
     v3d::init("vplay", "fa20");
     create_window();
     v3d::on_window_create(xcb_surface);
+
+    mainloop();
   }
   catch (std::exception const& e)
   {
     printf("%s\n", e.what());
   }
+  v3d::get_device().waitIdle();
   v3d::free_resources();
 
   if (xcb_surface)

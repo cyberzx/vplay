@@ -64,6 +64,46 @@ auto get_vk_array(vkEnumerateFunc&& func, std::vector<vkEnumObj>& result, Args&&
   }
 }
 
+inline void device_destroy(vk::Semaphore& handle, vk::Device const& device)
+{
+  device.destroySemaphore(handle);
+}
+
+inline void device_destroy(vk::CommandPool& handle, vk::Device const& device)
+{
+  device.destroyCommandPool(handle);
+}
+
+inline void device_destroy(vk::Framebuffer& handle, vk::Device const& device)
+{
+  device.destroyFramebuffer(handle);
+}
+
+inline void device_destroy(vk::ShaderModule& handle, vk::Device const& device)
+{
+  device.destroyShaderModule(handle);
+}
+
+inline void device_destroy(vk::Pipeline& handle, vk::Device const& device)
+{
+  device.destroyPipeline(handle);
+}
+
+inline void device_destroy(vk::PipelineCache& handle, vk::Device const& device)
+{
+  device.destroyPipelineCache(handle);
+}
+
+inline void device_destroy(vk::PipelineLayout& handle, vk::Device const& device)
+{
+  device.destroyPipelineLayout(handle);
+}
+
+inline void device_destroy(vk::RenderPass& handle, vk::Device const& device)
+{
+  device.destroyRenderPass(handle);
+}
+
 inline void device_destroy(vk::DeviceMemory& handle, vk::Device const& device)
 {
   device.freeMemory(handle);

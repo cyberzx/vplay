@@ -12,7 +12,10 @@ namespace v3d
   void  on_window_create(VkSurfaceKHR surface);
   void  on_window_resize(VkSurfaceKHR surface);
   void  on_device_lost();
+  
+  void  render();
 
   vk::Instance&   get_vk();
+  vk::Device&     get_device();
 }
 

@@ -461,7 +461,7 @@ static void  prepare_command_pool()
 static void   write_command_buffers()
 {
   vk::ClearValue const clearValues[2] = {
-      vk::ClearColorValue(std::array<float, 4>({{0.8f, 0.2f, 0.2f, 0.2f}})),
+      vk::ClearColorValue(std::array<float, 4>({{0.5f, 0.2f, 0.2f, 0.2f}})),
       vk::ClearDepthStencilValue(1.0f, 0u)};
 
 
@@ -537,7 +537,7 @@ static void  prepare_pipeline()
           .setDepthClampEnable(VK_FALSE)
           .setRasterizerDiscardEnable(VK_FALSE)
           .setPolygonMode(vk::PolygonMode::eFill)
-          .setCullMode(vk::CullModeFlagBits::eBack)
+          .setCullMode(vk::CullModeFlagBits::eNone)
           .setFrontFace(vk::FrontFace::eCounterClockwise)
           .setDepthBiasEnable(VK_FALSE)
           .setLineWidth(1.0f);

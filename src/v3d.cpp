@@ -309,8 +309,8 @@ void  shutdown()
   active_GPU = -1;
   system_GPUs.clear();
 
-  vktools::device_destroy(render_finished_semaphore, device);
-  vktools::device_destroy(image_acquired_semaphore, device);
+  vktools::destroy_handle(render_finished_semaphore, device);
+  vktools::destroy_handle(image_acquired_semaphore, device);
   vktools::destroy_handle(device);
   vktools::destroy_handle(instance);
 }

@@ -153,7 +153,9 @@ int main()
   {
     printf("%s\n", e.what());
   }
-  v3d::get_device().waitIdle();
+  vk::Device& dev = v3d::get_device();
+  if (dev)
+    dev.waitIdle();
   v3d::free_resources();
 
   if (xcb_surface)
